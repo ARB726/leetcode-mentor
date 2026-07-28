@@ -1,0 +1,4 @@
+groq
+gitpython
+rich
+python-dotenv
