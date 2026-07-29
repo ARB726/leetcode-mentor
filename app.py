@@ -2,23 +2,32 @@ import streamlit as st
 import os
 import json
 import pandas as pd
+import concurrent.futures
 from groq import Groq
 from dotenv import load_dotenv
 from agents.analyst import analyze_problem
 from agents.reviewer import review_code
 from agents.optimizer import optimize_solution
 from agents.teacher import teach_pattern
-from main import save_and_push_to_github, run_agents_parallel
-import asyncio
+from main import save_and_push_to_github, extract_problem_info
 from pdf_export import export_to_pdf
-from main import extract_problem_info
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+def get_secret(key):
+    try:
+        return st.secrets[key]
+    except:
+        return os.getenv(key)
+
+os.environ["GITHUB_USERNAME"] = get_secret("GITHUB_USERNAME") or ""
+os.environ["GITHUB_REPO"] = get_secret("GITHUB_REPO") or ""
+os.environ["GITHUB_TOKEN"] = get_secret("GITHUB_TOKEN") or ""
+
+client = Groq(api_key=get_secret("GROQ_API_KEY"))
 
 st.set_page_config(page_title="LeetCode Mentor", page_icon="🧠", layout="wide")
 
-# Sidebar navigation
 page = st.sidebar.selectbox("Navigate", ["🧠 Mentor", "📊 Dashboard"])
 
 if page == "🧠 Mentor":
@@ -42,10 +51,6 @@ if page == "🧠 Mentor":
                 st.markdown(analysis)
 
             with st.spinner("⚡ Running Agents 2, 3 & 4 in parallel..."):
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-                import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     review_future = executor.submit(review_code, client, problem, solution, analysis)
                     optimize_future = executor.submit(optimize_solution, client, problem, solution, analysis)
@@ -65,25 +70,23 @@ if page == "🧠 Mentor":
             with col_b:
                 with st.expander("⚡ Optimized Solution", expanded=True):
                     st.markdown(optimized)
-
-                # Copy button for optimized solution
                 st.code(optimized, language="python")
 
             with st.spinner("📤 Agent 5: Pushing to GitHub..."):
                 save_and_push_to_github(problem, solution, analysis, review, optimized, lesson)
             st.success("✅ Pushed to GitHub!")
             st.balloons()
-            st.markdown(f"### 🎉 [View on GitHub](https://github.com/{os.getenv('GITHUB_USERNAME')}/{os.getenv('GITHUB_REPO')})")
-            # PDF Export
+            st.markdown(f"### 🎉 [View on GitHub](https://github.com/{get_secret('GITHUB_USERNAME')}/{get_secret('GITHUB_REPO')})")
+
             problem_name, difficulty = extract_problem_info(problem)
             pdf_bytes = export_to_pdf(problem_name, problem, solution, analysis, review, optimized, lesson)
             st.download_button(
-            label="📄 Download PDF Report",
-            data=pdf_bytes,
-            file_name=f"{problem_name}-{difficulty}-analysis.pdf",
-            mime="application/pdf",
-            use_container_width=True
-)
+                label="📄 Download PDF Report",
+                data=pdf_bytes,
+                file_name=f"{problem_name}-{difficulty}-analysis.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
 elif page == "📊 Dashboard":
     st.title("📊 Your LeetCode Progress")
@@ -101,7 +104,6 @@ elif page == "📊 Dashboard":
         else:
             df = pd.DataFrame(progress.values())
 
-            # Stats row
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("Total Solved", len(df))
             col2.metric("Easy", len(df[df["difficulty"] == "easy"]))
@@ -109,23 +111,15 @@ elif page == "📊 Dashboard":
             col4.metric("Hard", len(df[df["difficulty"] == "hard"]))
 
             st.divider()
-
-            # Difficulty chart
             st.subheader("Problems by Difficulty")
-            diff_counts = df["difficulty"].value_counts()
-            st.bar_chart(diff_counts)
+            st.bar_chart(df["difficulty"].value_counts())
 
             st.divider()
-
-            # Problems solved over time
             st.subheader("Problems Solved Over Time")
             df["date"] = pd.to_datetime(df["date"], format="%Y%m%d")
-            timeline = df.groupby("date").size().cumsum()
-            st.line_chart(timeline)
+            st.line_chart(df.groupby("date").size().cumsum())
 
             st.divider()
-
-            # Full problem list
             st.subheader("All Solved Problems")
             st.dataframe(
                 df[["problem", "difficulty", "date"]].sort_values("date", ascending=False),
