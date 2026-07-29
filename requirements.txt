@@ -1,4 +1,7 @@
-groq
+﻿groq
 gitpython
 rich
 python-dotenv
+streamlit
+reportlab
+pandas
