@@ -86,13 +86,20 @@ if page == "🧠 Mentor":
             with diag_col1:
                 st.markdown("#### 🔁 Algorithm Flow")
                 st.markdown("*How this specific solution works*")
+                import re
                 clean_algo = algo_diagram.replace("```mermaid", "").replace("```", "").strip()
+                clean_algo = re.sub(r'\[([^\]]*)\[([^\]]*)\]([^\]]*)\]', r'[\1\2\3]', clean_algo)
+                clean_algo = re.sub(r'\[([^\]]*)\[', r'[\1', clean_algo)
+                clean_algo = re.sub(r'\]([^\[]*)\]', r'\1]', clean_algo)
                 st.markdown(f"```mermaid\n{clean_algo}\n```")
 
             with diag_col2:
                 st.markdown("#### 🗺️ General Pattern")
                 st.markdown("*How to recognize and apply this pattern*")
                 clean_pattern = pattern_diagram.replace("```mermaid", "").replace("```", "").strip()
+                clean_pattern = re.sub(r'\[([^\]]*)\[([^\]]*)\]([^\]]*)\]', r'[\1\2\3]', clean_pattern)
+                clean_pattern = re.sub(r'\[([^\]]*)\[', r'[\1', clean_pattern)
+                clean_pattern = re.sub(r'\]([^\[]*)\]', r'\1]', clean_pattern)
                 st.markdown(f"```mermaid\n{clean_pattern}\n```")
 
             with st.spinner("📤 Agent 7 - Git Agent: Pushing to GitHub..."):

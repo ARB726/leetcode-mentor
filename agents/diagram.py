@@ -33,7 +33,10 @@ def generate_algorithm_diagram(client: Groq, problem: str, optimized: str, langu
                       D -->|Yes| E[Return True]
                       D -->|No| F[Add to set]
                       F --> C
-                      C --> G[Return False]"""
+                      C --> G[Return False]
+                      - NEVER use array indexing like nums[i] or arr[left] in node text
+                      - Write as plain text like subtract left element instead
+                      """
             },
             {
                 "role": "user",
@@ -79,7 +82,10 @@ def generate_pattern_diagram(client: Groq, lesson: str, language: str = "Python"
                       B -->|Yes| C[Use HashSet]
                       B -->|No| D[Consider sorting]
                       C --> E[O of n time]
-                      D --> F[O of n log n time]"""
+                      D --> F[O of n log n time]
+                      - NEVER use array indexing like nums[i] or arr[left] in node text
+                      - Write as plain text like subtract left element instead
+                      """
             },
             {
                 "role": "user",
