@@ -18,7 +18,6 @@ def export_to_pdf(problem_name: str, problem: str, solution: str, analysis: str,
 
     styles = getSampleStyleSheet()
 
-    # Custom styles
     title_style = ParagraphStyle(
         "CustomTitle",
         parent=styles["Title"],
@@ -52,7 +51,6 @@ def export_to_pdf(problem_name: str, problem: str, solution: str, analysis: str,
     )
 
     def clean(text):
-        """Clean markdown for PDF"""
         import re
         text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
         text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
@@ -62,47 +60,47 @@ def export_to_pdf(problem_name: str, problem: str, solution: str, analysis: str,
     story = []
 
     # Title
-    story.append(Paragraph(f"🧠 LeetCode Mentor Analysis", title_style))
+    story.append(Paragraph("LeetCode Mentor Analysis", title_style))
     story.append(Paragraph(f"{problem_name.replace('-', ' ').title()}", heading_style))
     story.append(HRFlowable(width="100%", thickness=1, color=HexColor("#4f46e5")))
     story.append(Spacer(1, 12))
 
     # Problem
-    story.append(Paragraph("📋 Problem", heading_style))
+    story.append(Paragraph("Problem", heading_style))
     for line in problem.split("\n")[:20]:
         if line.strip():
             story.append(Paragraph(line.strip(), body_style))
     story.append(Spacer(1, 8))
 
     # My Solution
-    story.append(Paragraph("💻 My Solution", heading_style))
+    story.append(Paragraph("My Solution", heading_style))
     for line in solution.split("\n"):
         story.append(Paragraph(line if line.strip() else "&nbsp;", code_style))
     story.append(Spacer(1, 8))
 
-    # Analysis
-    story.append(Paragraph("🔍 Problem Analysis", heading_style))
+    # Agent 1
+    story.append(Paragraph("Agent 1 - Problem Analyst", heading_style))
     for line in analysis.split("\n"):
         if line.strip():
             story.append(Paragraph(line.strip(), body_style))
     story.append(Spacer(1, 8))
 
-    # Code Review
-    story.append(Paragraph("🔎 Code Review", heading_style))
+    # Agent 2
+    story.append(Paragraph("Agent 2 - Code Reviewer", heading_style))
     for line in review.split("\n"):
         if line.strip():
             story.append(Paragraph(line.strip(), body_style))
     story.append(Spacer(1, 8))
 
-    # Optimized Solution
-    story.append(Paragraph("⚡ Optimized Solution", heading_style))
+    # Agent 3
+    story.append(Paragraph("Agent 3 - Solution Optimizer", heading_style))
     for line in optimized.split("\n"):
         if line.strip():
             story.append(Paragraph(line.strip(), body_style))
     story.append(Spacer(1, 8))
 
-    # Lesson
-    story.append(Paragraph("🎓 Lesson & Pattern", heading_style))
+    # Agent 4
+    story.append(Paragraph("Agent 4 - Pattern Teacher", heading_style))
     for line in lesson.split("\n"):
         if line.strip():
             story.append(Paragraph(line.strip(), body_style))

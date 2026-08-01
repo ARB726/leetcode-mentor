@@ -17,12 +17,23 @@ def generate_algorithm_diagram(client: Groq, problem: str, optimized: str, langu
                 - No markdown backticks
                 - No explanations before or after
                 - Keep node text short under 30 chars
-                - Use simple ASCII only no special characters
-                - Max 15 nodes
-                - Use these shapes:
-                  [text] for process steps
-                  {text} for decisions
-                  ([text]) for start and end"""
+                - Use simple ASCII only, no special characters
+                - Max 12 nodes
+                - ONLY use these two shapes:
+                  [text] for all steps, start, and end
+                  {text} for decisions and conditions only
+                - NEVER use () or ([]) or stadium or circle shapes
+                - NEVER use special chars like colons in node text
+                - Each node must have a unique ID like A, B, C
+                - Example of valid syntax:
+                  flowchart TD
+                      A[Start] --> B[Initialize set]
+                      B --> C[Loop through array]
+                      C --> D{num in set?}
+                      D -->|Yes| E[Return True]
+                      D -->|No| F[Add to set]
+                      F --> C
+                      C --> G[Return False]"""
             },
             {
                 "role": "user",
@@ -47,7 +58,6 @@ def generate_pattern_diagram(client: Groq, lesson: str, language: str = "Python"
                 "role": "system",
                 "content": """You are an expert at creating Mermaid diagrams to teach algorithmic patterns.
                 Generate a Mermaid flowchart showing how the GENERAL PATTERN works.
-                This should be reusable and apply to ANY problem using this pattern.
 
                 CRITICAL RULES:
                 - Output ONLY valid Mermaid code
@@ -55,10 +65,21 @@ def generate_pattern_diagram(client: Groq, lesson: str, language: str = "Python"
                 - No markdown backticks
                 - No explanations before or after
                 - Keep node text short under 30 chars
-                - Use simple ASCII only no special characters
-                - Max 15 nodes
-                - Make it generic enough to apply to similar problems
-                - Add a subgraph showing when to USE this pattern"""
+                - Use simple ASCII only, no special characters
+                - Max 12 nodes
+                - ONLY use these two shapes:
+                  [text] for all steps, start, and end
+                  {text} for decisions and conditions only
+                - NEVER use () or ([]) or stadium or circle shapes
+                - NEVER use special chars like colons in node text
+                - Each node must have a unique ID like A, B, C
+                - Example of valid syntax:
+                  flowchart TD
+                      A[Identify pattern] --> B{Duplicate check?}
+                      B -->|Yes| C[Use HashSet]
+                      B -->|No| D[Consider sorting]
+                      C --> E[O of n time]
+                      D --> F[O of n log n time]"""
             },
             {
                 "role": "user",
