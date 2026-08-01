@@ -9,6 +9,7 @@ from agents.analyst import analyze_problem
 from agents.reviewer import review_code
 from agents.optimizer import optimize_solution
 from agents.teacher import teach_pattern
+from agents.diagram import generate_algorithm_diagram, generate_pattern_diagram
 from main import save_and_push_to_github, extract_problem_info
 from pdf_export import export_to_pdf
 
@@ -32,7 +33,9 @@ page = st.sidebar.selectbox("Navigate", ["🧠 Mentor", "📊 Dashboard"])
 
 if page == "🧠 Mentor":
     st.title("🧠 LeetCode Mentor — Multi Agent System")
-    st.markdown("Paste your LeetCode problem and solution, and 5 AI agents will analyze it and push to GitHub!")
+    st.markdown("Paste your LeetCode problem and solution, and 7 AI agents will analyze it!")
+
+    language = st.selectbox("🖥️ Programming Language", ["Python", "Java", "C++", "JavaScript", "Go", "Rust", "TypeScript"])
 
     col1, col2 = st.columns(2)
     with col1:
@@ -44,37 +47,57 @@ if page == "🧠 Mentor":
         if not problem or not solution:
             st.error("Please paste both the problem and your solution!")
         else:
-            with st.spinner("🔍 Agent 1: Analyzing problem..."):
-                analysis = analyze_problem(client, problem)
-            st.success("✅ Agent 1 Done!")
-            with st.expander("📋 Problem Analysis", expanded=True):
+            with st.spinner("🔍 Agent 1 - Problem Analyst: Analyzing problem..."):
+                analysis = analyze_problem(client, problem, language)
+            st.success("✅ Agent 1 - Problem Analyst Done!")
+            with st.expander("📋 Problem Analyst — Analysis", expanded=True):
                 st.markdown(analysis)
 
-            with st.spinner("⚡ Running Agents 2, 3 & 4 in parallel..."):
+            with st.spinner("⚡ Running Agents 2, 3, 4, 5 & 6 in parallel..."):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    review_future = executor.submit(review_code, client, problem, solution, analysis)
-                    optimize_future = executor.submit(optimize_solution, client, problem, solution, analysis)
-                    teach_future = executor.submit(teach_pattern, client, problem, solution, analysis)
+                    review_future = executor.submit(review_code, client, problem, solution, analysis, language)
+                    optimize_future = executor.submit(optimize_solution, client, problem, solution, analysis, language)
+                    teach_future = executor.submit(teach_pattern, client, problem, solution, analysis, language)
                     review = review_future.result()
                     optimized = optimize_future.result()
                     lesson = teach_future.result()
+                    algo_future = executor.submit(generate_algorithm_diagram, client, problem, optimized, language)
+                    pattern_future = executor.submit(generate_pattern_diagram, client, lesson, language)
+                    algo_diagram = algo_future.result()
+                    pattern_diagram = pattern_future.result()
 
-            st.success("✅ Agents 2, 3 & 4 Done!")
+            st.success("✅ All Agents Done!")
 
             col_a, col_b = st.columns(2)
             with col_a:
-                with st.expander("🔎 Code Review", expanded=True):
+                with st.expander("🔎 Code Reviewer — Review", expanded=True):
                     st.markdown(review)
-                with st.expander("🎓 Lesson & Pattern", expanded=True):
+                with st.expander("🎓 Pattern Teacher — Lesson", expanded=True):
                     st.markdown(lesson)
             with col_b:
-                with st.expander("⚡ Optimized Solution", expanded=True):
+                with st.expander("⚡ Solution Optimizer — Optimized Solution", expanded=True):
                     st.markdown(optimized)
-                st.code(optimized, language="python")
+                st.code(optimized, language=language.lower())
 
-            with st.spinner("📤 Agent 5: Pushing to GitHub..."):
+            st.divider()
+            st.subheader("📊 Visual Diagrams")
+            diag_col1, diag_col2 = st.columns(2)
+
+            with diag_col1:
+                st.markdown("#### 🔁 Algorithm Flow")
+                st.markdown("*How this specific solution works*")
+                clean_algo = algo_diagram.replace("```mermaid", "").replace("```", "").strip()
+                st.markdown(f"```mermaid\n{clean_algo}\n```")
+
+            with diag_col2:
+                st.markdown("#### 🗺️ General Pattern")
+                st.markdown("*How to recognize and apply this pattern*")
+                clean_pattern = pattern_diagram.replace("```mermaid", "").replace("```", "").strip()
+                st.markdown(f"```mermaid\n{clean_pattern}\n```")
+
+            with st.spinner("📤 Agent 7 - Git Agent: Pushing to GitHub..."):
                 save_and_push_to_github(problem, solution, analysis, review, optimized, lesson)
-            st.success("✅ Pushed to GitHub!")
+            st.success("✅ Agent 7 - Git Agent: Pushed to GitHub!")
             st.balloons()
             st.markdown(f"### 🎉 [View on GitHub](https://github.com/{get_secret('GITHUB_USERNAME')}/{get_secret('GITHUB_REPO')})")
 
