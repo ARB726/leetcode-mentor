@@ -5,7 +5,7 @@ def analyze_problem(client: Groq, problem: str , language: str) -> str:
     print("\n🔍 Agent 1: Analyzing problem...")
     
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",

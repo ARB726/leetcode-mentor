@@ -4,7 +4,7 @@ def generate_algorithm_diagram(client: Groq, problem: str, optimized: str, langu
     print("\n📊 Agent 5 - Algorithm Diagram: Visualizing solution flow...")
     
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",
@@ -55,7 +55,7 @@ def generate_pattern_diagram(client: Groq, lesson: str, language: str = "Python"
     print("\n🗺️ Agent 6 - Pattern Diagram: Visualizing the general pattern...")
     
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",

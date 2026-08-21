@@ -4,7 +4,7 @@ def optimize_solution(client: Groq, problem: str, solution: str, review: str , l
     print("\n⚡ Agent 3: Optimizing your solution...")
     
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",
