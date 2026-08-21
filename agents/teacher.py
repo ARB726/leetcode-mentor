@@ -4,7 +4,7 @@ def teach_pattern(client: Groq, problem: str, solution: str, optimized: str , la
     print("\n🎓 Agent 4: Teaching you the pattern...")
     
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="llama3-70b-8192",
         messages=[
             {
                 "role": "system",
