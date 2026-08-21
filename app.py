@@ -53,7 +53,7 @@ if page == "🧠 Mentor":
             with st.expander("📋 Problem Analyst — Analysis", expanded=True):
                 st.markdown(analysis)
 
-          with st.spinner("⚡ Running Agents 2, 3 & 4 in parallel..."):
+            with st.spinner("⚡ Running Agents 2, 3 & 4 in parallel..."):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     review_future = executor.submit(review_code, client, problem, solution, analysis, language)
                     optimize_future = executor.submit(optimize_solution, client, problem, solution, analysis, language)
