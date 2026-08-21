@@ -53,7 +53,7 @@ if page == "🧠 Mentor":
             with st.expander("📋 Problem Analyst — Analysis", expanded=True):
                 st.markdown(analysis)
 
-            with st.spinner("⚡ Running Agents 2, 3, 4, 5 & 6 in parallel..."):
+          with st.spinner("⚡ Running Agents 2, 3 & 4 in parallel..."):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     review_future = executor.submit(review_code, client, problem, solution, analysis, language)
                     optimize_future = executor.submit(optimize_solution, client, problem, solution, analysis, language)
@@ -61,10 +61,15 @@ if page == "🧠 Mentor":
                     review = review_future.result()
                     optimized = optimize_future.result()
                     lesson = teach_future.result()
-                    algo_future = executor.submit(generate_algorithm_diagram, client, problem, optimized, language)
-                    pattern_future = executor.submit(generate_pattern_diagram, client, lesson, language)
-                    algo_diagram = algo_future.result()
-                    pattern_diagram = pattern_future.result()
+
+            import time
+            with st.spinner("📊 Agent 5 - Algorithm Diagram: Creating visual..."):
+                time.sleep(3)
+                algo_diagram = generate_algorithm_diagram(client, problem, optimized, language)
+
+            with st.spinner("🗺️ Agent 6 - Pattern Diagram: Creating visual..."):
+                time.sleep(3)
+                pattern_diagram = generate_pattern_diagram(client, lesson, language)
 
             st.success("✅ All Agents Done!")
 
