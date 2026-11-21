@@ -32,7 +32,7 @@ jobs:
         run: |
           docker run -d --name mentor-web -p 8501:8501 mentor-web:test
           trap 'docker logs mentor-web; docker rm -f mentor-web' EXIT
-          curl --fail --retry 15 --retry-connrefused --retry-delay 2 http://localhost:8501/_stcore/health
+          curl --fail --max-time 5 --retry 15 --retry-all-errors --retry-delay 2 --retry-max-time 60 http://localhost:8501/_stcore/health
           curl --fail --output /tmp/mentor-home.html http://localhost:8501/
           grep -q 'Practice studio' /tmp/mentor-home.html
   test:

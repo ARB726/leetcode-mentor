@@ -23,7 +23,7 @@ image="${repository}:web-${RELEASE_SHA}"
 docker build --platform linux/amd64 -t "$image" web
 docker run -d --name mentor-release -p 8501:8501 "$image"
 trap 'docker logs mentor-release; docker rm -f mentor-release' EXIT
-curl --fail --retry 20 --retry-connrefused --retry-delay 2 http://localhost:8501/_stcore/health
+curl --fail --max-time 5 --retry 20 --retry-all-errors --retry-delay 2 --retry-max-time 60 http://localhost:8501/_stcore/health
 curl --fail --output /tmp/mentor-local.html http://localhost:8501/
 grep -q 'Practice studio' /tmp/mentor-local.html
 aws ecr get-login-password | docker login --username AWS --password-stdin "${repository%%/*}"
