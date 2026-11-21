@@ -17,7 +17,19 @@ STACK = "leetcode-mentor"
 STATE = ROOT / ".venv" / "aws-deployment.json"
 
 
-def source_archive():
+def source_archive(web=False):
+    if web:
+        web_root = ROOT / "web"
+        entries = [(web_root / name, name) for name in ["Dockerfile", ".dockerignore", "package.json", "package-lock.json", "next.config.ts", "tsconfig.json"]]
+        entries += [(path, str(path.relative_to(web_root)).replace("\\", "/")) for path in sorted((web_root / "src").rglob("*")) if path.is_file() and path.suffix in [".ts", ".tsx", ".css"]]
+        buffer = io.BytesIO()
+        digest = hashlib.sha256()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path, name in entries:
+                content = path.read_bytes()
+                digest.update(name.encode() + b"\0" + content)
+                archive.writestr(name, content)
+        return buffer.getvalue(), "web-" + digest.hexdigest()[:20]
     paths = ["Dockerfile", ".dockerignore", "requirements.txt", "app.py", "main.py", "pdf_export.py", ".streamlit/config.toml"]
     paths += [str(path.relative_to(ROOT)).replace("\\", "/") for path in sorted((ROOT / "agents").glob("*.py"))]
     buffer = io.BytesIO()
@@ -36,7 +48,8 @@ def stack_details(cf):
     return stack, outputs
 
 
-def deploy(session, command):
+def deploy(session, command, web=False):
+    state_path = ROOT / ".venv" / "aws-web-deployment.json" if web else STATE
     config = Config(retries={"mode": "standard", "max_attempts": 5}, connect_timeout=10, read_timeout=30)
     cf = session.client("cloudformation", config=config)
     template = (ROOT / "deploy" / "express.yaml").read_text(encoding="utf-8")
@@ -56,8 +69,8 @@ def deploy(session, command):
     stack, outputs = stack_details(cf)
     if command == "status":
         print(json.dumps({"stack_status": stack["StackStatus"], "outputs": outputs}, indent=2))
-        if STATE.exists():
-            state = json.loads(STATE.read_text())
+        if state_path.exists():
+            state = json.loads(state_path.read_text())
             if state.get("build_id"):
                 build = session.client("codebuild", config=config).batch_get_builds(ids=[state["build_id"]])["builds"][0]
                 print(json.dumps({"build_status": build["buildStatus"], "phase": build["currentPhase"], "logs": build.get("logs", {}).get("deepLink")}))
@@ -69,12 +82,13 @@ def deploy(session, command):
     if command == "build":
         if stack["StackStatus"] not in ["CREATE_COMPLETE", "UPDATE_COMPLETE"]:
             raise ValueError("Wait for the stack to finish before starting a build")
-        key = dotenv_values(ROOT / ".env").get("GROQ_API_KEY")
-        if not key:
-            raise ValueError("Missing GROQ_API_KEY in local .env")
-        # The secret is transmitted over TLS and is never written to the source archive or logs.
-        session.client("secretsmanager", config=config).put_secret_value(SecretId=outputs["SecretArn"], SecretString=key)
-        archive, tag = source_archive()
+        if not web:
+            key = dotenv_values(ROOT / ".env").get("GROQ_API_KEY")
+            if not key:
+                raise ValueError("Missing GROQ_API_KEY in local .env")
+            # The web release reuses the existing Mentor secret unchanged.
+            session.client("secretsmanager", config=config).put_secret_value(SecretId=outputs["SecretArn"], SecretString=key)
+        archive, tag = source_archive(web=web)
         location = f"source/{tag}.zip"
         session.client("s3", config=config).put_object(Bucket=outputs["SourceBucket"], Key=location, Body=archive, ServerSideEncryption="AES256")
         image = outputs["RepositoryUri"] + ":" + tag
@@ -82,23 +96,40 @@ def deploy(session, command):
             projectName=outputs["BuildProject"], sourceLocationOverride=outputs["SourceBucket"] + "/" + location,
             environmentVariablesOverride=[{"name": "IMAGE_URI", "value": image, "type": "PLAINTEXT"},
                                           {"name": "REGISTRY", "value": image.split("/")[0], "type": "PLAINTEXT"}])
-        STATE.parent.mkdir(exist_ok=True)
-        STATE.write_text(json.dumps({"build_id": result["build"]["id"], "image_uri": image}), encoding="utf-8")
+        state_path.parent.mkdir(exist_ok=True)
+        state_path.write_text(json.dumps({"build_id": result["build"]["id"], "image_uri": image}), encoding="utf-8")
         print(json.dumps({"build_id": result["build"]["id"], "image_uri": image}))
         return
-    if command == "launch":
-        state = json.loads(STATE.read_text())
+    if command in ["launch", "rollback"]:
+        state = json.loads(state_path.read_text())
+        if command == "rollback":
+            if not web or not state.get("previous_image_uri"):
+                raise ValueError("No previous web deployment image is recorded")
+            image = state["previous_image_uri"]
+        else:
+            image = state["image_uri"]
+            if web and not image.endswith(":" + source_archive(web=True)[1]):
+                raise ValueError("Web sources changed after the build; build the current sources before launch")
         build = session.client("codebuild", config=config).batch_get_builds(ids=[state["build_id"]])["builds"][0]
-        if build["buildStatus"] != "SUCCEEDED":
+        if command == "launch" and build["buildStatus"] != "SUCCEEDED":
             raise ValueError("Container build must succeed before launch")
-        result = cf.update_stack(StackName=STACK, TemplateBody=template, Capabilities=["CAPABILITY_IAM"],
-                                 Parameters=[{"ParameterKey": "ImageUri", "ParameterValue": state["image_uri"]}])
+        parameters = [{"ParameterKey": item["ParameterKey"], "UsePreviousValue": True} for item in stack.get("Parameters", []) if item["ParameterKey"] != "ImageUri"]
+        parameters.append({"ParameterKey": "ImageUri", "ParameterValue": image})
+        current_image = next((item["ParameterValue"] for item in stack.get("Parameters", []) if item["ParameterKey"] == "ImageUri"), "")
+        if current_image == image:
+            print(json.dumps({"image_already_deployed": image}))
+            return
+        if command == "launch":
+            state["previous_image_uri"] = current_image
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+        result = cf.update_stack(StackName=STACK, UsePreviousTemplate=True, Capabilities=["CAPABILITY_IAM"], Parameters=parameters)
         print(json.dumps({"updating_stack": result["StackId"]}))
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["prepare", "status", "events", "build", "launch"])
+    parser.add_argument("command", choices=["prepare", "status", "events", "build", "launch", "rollback"])
+    parser.add_argument("--web", action="store_true", help="Build/release the Next.js app, preserving the existing provider secret")
     parser.add_argument("--profile", required=True)
     parser.add_argument("--expected-account", required=True)
     parser.add_argument("--region", default="us-east-2")
@@ -110,7 +141,7 @@ def main():
     if identity["Account"] != args.expected_account:
         parser.error("AWS account does not match --expected-account")
     try:
-        deploy(session, args.command)
+        deploy(session, args.command, web=args.web)
     except (ClientError, ValueError) as error:
         print(str(error), file=sys.stderr)
         return 1

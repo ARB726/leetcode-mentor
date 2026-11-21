@@ -25,6 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Validate 50-task scheduler benchmark (simulated)
+        run: node --import tsx scripts/benchmark.ts --limit=50 --output=/tmp/mentor-scheduler.json
       - run: npm run build
       - run: bash -n ../deploy/release-web.sh
       - run: docker build -t mentor-web:test .
