@@ -8,7 +8,7 @@ The optional `supabase/mentor_reviews.sql` creates a new Mentor-only table and o
 
 Only the public Supabase URL/key reaches the browser. Keep `GROQ_API_KEY` server-side. AI feedback does not execute code. Demo throttles are per process and reset on restart; use authentication and an external rate limiter before expanding a public deployment.
 
-This directory is the Next.js replacement under review. The root Streamlit application and its deployment continue to work until a web release is explicitly deployed.
+This directory contains the AWS-hosted Next.js workspace. The root Streamlit source remains available as a separate legacy application and rollback option.
 
 ## Seven-specialist reviews
 
