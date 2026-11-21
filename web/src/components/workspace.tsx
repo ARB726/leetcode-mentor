@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { examples } from "@/lib/examples";
 import type { Coaching, Practice, PublicConfig, Review } from "@/lib/types";
+import { agentCatalog, type AgentTrace, type PipelineReport } from "@/lib/pipeline";
+import { readReviewStream } from "@/lib/review-stream";
 
 type Page = "studio" | "history" | "patterns";
 type Tab = "Review" | "Optimize" | "Pattern" | "Interview";
@@ -100,6 +102,10 @@ export default function Workspace({ config }: { config: PublicConfig }) {
   const [draft, setDraft] = useState<Draft>(initialDraft);
   const [review, setReview] = useState<Review | null>(null);
   const [coaching, setCoaching] = useState<Coaching | null>(null);
+  const [reviewMode, setReviewMode] = useState<"quick" | "deep">("deep");
+  const [traces, setTraces] = useState<AgentTrace[]>([]);
+  const [pipelineReport, setPipelineReport] = useState<PipelineReport | null>(null);
+  const reviewAbort = useRef<AbortController | null>(null);
   const [identity, setIdentity] = useState<{ id: string; createdAt: string } | null>(null);
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<Tab>("Review");
@@ -128,6 +134,9 @@ export default function Workspace({ config }: { config: PublicConfig }) {
   const token = session?.access_token;
   const example = examples.find(item => item.title === draft.title && item.problem === draft.problem);
   useEffect(() => {
+    return () => reviewAbort.current?.abort();
+  }, []);
+  useEffect(() => {
     if (!client) return;
     const { data } = client.auth.onAuthStateChange((_event, next) => {
       if (authUser.current !== next?.user.id) {
@@ -135,6 +144,7 @@ export default function Workspace({ config }: { config: PublicConfig }) {
           setReview(null); setCoaching(null); setDraft(initialDraft); setExplanation(""); setTab("Review"); setEditing(false);
         }
         epoch.current++; setBusy(""); setSaved(false); setIdentity(null); setPractices([]); setHistoryError(""); setNotice("");
+        reviewAbort.current?.abort(); setTraces([]); setPipelineReport(null);
       }
       authUser.current = next?.user.id; setSession(next); setAuthReady(true);
     });
@@ -168,6 +178,7 @@ export default function Workspace({ config }: { config: PublicConfig }) {
     setPage(next); setMenuOpen(false); setError(""); setQuery(""); window.scrollTo({ top: 0 });
   }
   function invalidate() {
+    reviewAbort.current?.abort(); setTraces([]); setPipelineReport(null);
     epoch.current++; setReview(null); setCoaching(null); setIdentity(null); setSaved(false); setBusy(""); setTab("Review"); setError(""); setNotice("");
   }
   function changeDraft(field: keyof Draft, value: string) {
@@ -207,6 +218,21 @@ export default function Workspace({ config }: { config: PublicConfig }) {
     setBusy(mode); setError(""); setNotice("");
     try {
       if (mode === "review") {
+        setReview(null); setCoaching(null);
+        setPipelineReport(null);
+        setTraces(reviewMode === "deep" ? agentCatalog.map(agent => ({ id: agent.id, state: "queued" })) : []);
+        if (reviewMode === "deep") {
+          const controller = new AbortController(); reviewAbort.current = controller;
+          const response = await fetch("/api/review", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ problem: draft.problem, solution: draft.solution, language: draft.language, mode: "deep" }) });
+          if (!response.ok) { const failure = await response.json(); throw new Error(failure.error || "Deep review could not start."); }
+          await readReviewStream(response, event => {
+            if (epoch.current !== current) return;
+            if (event.type === "agent") setTraces(previous => previous.map(item => item.id === event.agent.id ? event.agent : item));
+            if (event.type === "result") { setReview(event.review); setPipelineReport(event.report); setCoaching(null); setSaved(false); setTab("Review"); }
+          });
+          if (epoch.current === current) requestAnimationFrame(() => results.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          return;
+        }
         const data = await api<{ review: Review }>("/api/review", token, "POST", { problem: draft.problem, solution: draft.solution, language: draft.language });
         if (epoch.current !== current) return;
         setReview(data.review); setCoaching(null); setSaved(false); setTab("Review");
@@ -269,7 +295,8 @@ export default function Workspace({ config }: { config: PublicConfig }) {
         <div className="work-grid">
           <section className="panel editor-panel"><div className="panel-head"><div className="panel-icon dark"><Terminal size={19}/></div><h2>Solution editor</h2><span className="panel-corner"><Code2 size={16}/></span></div>
             <CodeEditor draft={draft} change={value => changeDraft("solution", value)} changeLanguage={value => changeDraft("language", value)}/>
-            <div className="runbar"><button className="button primary" disabled={!!busy || !authReady || !config.aiReady || !draft.problem.trim() || !draft.solution.trim()} onClick={() => generate("review")}>{busy === "review" ? <LoaderCircle className="spin" size={17}/> : <Sparkles size={17}/>} {busy === "review" ? "Reviewing…" : "Review solution"}<ArrowRight size={15}/></button>{!config.aiReady && <small>AI setup required</small>}</div>
+            <div className="review-mode" role="group" aria-label="Review depth"><button aria-pressed={reviewMode === "quick"} disabled={!!busy} onClick={() => setReviewMode("quick")}><strong>Quick review</strong><small>One focused model call</small></button><button aria-pressed={reviewMode === "deep"} disabled={!!busy} onClick={() => setReviewMode("deep")}><strong>Deep review <span>7 specialists</span></strong><small>Independent perspectives, one clear report</small></button></div>
+            <div className="runbar"><button className="button primary" disabled={!!busy || !authReady || !config.aiReady || !draft.problem.trim() || !draft.solution.trim()} onClick={() => generate("review")}>{busy === "review" ? <LoaderCircle className="spin" size={17}/> : <Sparkles size={17}/>} {busy === "review" ? "Reviewing…" : reviewMode === "deep" ? "Start deep review" : "Review solution"}</button>{busy === "review" && <button className="text-button" onClick={() => { reviewAbort.current?.abort(); epoch.current++; setBusy(""); setNotice("Review cancelled. Your code is still here."); setTraces(previous => previous.map(trace => trace.state === "running" || trace.state === "queued" ? { ...trace, state: "failed", error: "Cancelled" } : trace)); }}>Cancel</button>}{!config.aiReady && <small>AI setup required</small>}</div>
           </section>
           <section className="panel brief-panel"><div className="panel-head"><div className="panel-icon pale"><FileText size={18}/></div><h2>Problem brief</h2><button className="icon-button" title={editing ? "Finish editing" : "Edit problem brief"} aria-label={editing ? "Finish editing problem" : "Edit problem brief"} onClick={() => setEditing(!editing)}>{editing ? <Check size={17}/> : <Pencil size={15}/>}</button></div>
             {editing ? <div className="brief-edit"><label>Challenge title<input value={draft.title} onChange={event => changeDraft("title", event.target.value)} maxLength={160}/></label><label>Problem statement<textarea maxLength={16000} value={draft.problem} placeholder="Paste the problem, examples, and constraints…" onChange={event => changeDraft("problem", event.target.value)}/></label><button className="text-button" onClick={() => setEditing(false)}><Check size={14}/>Done editing</button></div> :
@@ -279,7 +306,8 @@ export default function Workspace({ config }: { config: PublicConfig }) {
               }) : <button className="text-button" onClick={() => setEditing(true)}>Add a problem statement <ArrowRight size={14}/></button>}</div>}
           </section>
         </div>
-        <section className="panel results" ref={results}><div className="panel-head"><div className="panel-icon mint"><Sparkles size={18}/></div><h2>Mentor feedback</h2>{review && <div className="result-actions"><button className="text-button" aria-label="Download Markdown report" onClick={() => exportPractice(draft, review, coaching)}><ArrowDownToLine size={15}/><span>Report</span></button><button className="text-button" disabled={!!busy || saved} onClick={save}>{saved ? <Check size={15}/> : <Save size={15}/>}<span>{saved ? "Saved" : busy === "save" ? "Saving…" : "Save practice"}</span></button></div>}</div>
+        {traces.length > 0 && <section className="panel pipeline-panel" aria-label="Seven specialist review pipeline"><div className="pipeline-heading"><div><span className="eyebrow">Independent analysis. Shared perspective.</span><h2>Your review team</h2></div><span className="pipeline-total" role="status">{traces.filter(trace => trace.state === "completed").length} / 7 complete{pipelineReport ? ` · ${(pipelineReport.elapsedMs / 1000).toFixed(1)}s` : ""}</span></div><div className="agent-grid">{agentCatalog.map(agent => { const trace = traces.find(item => item.id === agent.id)!; return <div key={agent.id} className={`agent-card agent-${trace.state} ${agent.id === "synthesis" ? "agent-synthesis" : ""}`}><span className="agent-status-icon">{trace.state === "running" ? <LoaderCircle className="spin" size={18}/> : trace.state === "completed" ? <Check size={18}/> : trace.state === "failed" ? <CircleAlert size={18}/> : <Layers3 size={18}/>}</span><div><h3>{agent.name}</h3><p>{agent.task}</p><span className="agent-state">{trace.state}{trace.durationMs !== undefined ? ` · ${(trace.durationMs / 1000).toFixed(1)}s` : ""}</span>{trace.error && <small className="agent-error">{trace.error}</small>}</div></div>; })}</div>{pipelineReport && <div className="pipeline-footnote"><span>Usage from completed calls: {pipelineReport.inputTokens.toLocaleString()} input / {pipelineReport.outputTokens.toLocaleString()} output tokens.</span><span>AI analysis; code has not been executed.</span></div>}{pipelineReport?.warnings.map(warning => <p className="pipeline-warning" key={warning}>{warning}</p>)}</section>}
+        <section className="panel results" ref={results}><div className="panel-head"><div className="panel-icon mint"><Sparkles size={18}/></div><h2>Mentor feedback</h2>{review && <div className="result-actions"><button className="text-button" onClick={() => window.print()}><FileText size={15}/><span>Print / PDF</span></button><button className="text-button" aria-label="Download Markdown report" onClick={() => exportPractice(draft, review, coaching)}><ArrowDownToLine size={15}/><span>Report</span></button><button className="text-button" disabled={!!busy || saved} onClick={save}>{saved ? <Check size={15}/> : <Save size={15}/>}<span>{saved ? "Saved" : busy === "save" ? "Saving…" : "Save practice"}</span></button></div>}</div>
           {!review ? <div className={`feedback-empty ${busy === "review" ? "review-in-progress" : ""}`} role="status" aria-live="polite"><span className="empty-orbit">{busy === "review" ? <LoaderCircle className="spin" size={20}/> : <MessageSquare size={20}/>}</span><div><h3>{busy === "review" ? "Your mentor is reading through your approach…" : "Good practice starts with a little curiosity."}</h3><p>{busy === "review" ? "Checking reasoning, edge cases, and opportunities to simplify. Your code stays editable." : "Write your solution, then get a fresh perspective on correctness, complexity, and what to try next."}<span className="feedback-chips"><span>Correctness</span><span>Complexity</span><span>Pattern recognition</span></span></p></div></div> : <>
             <div className="tabs" aria-label="Feedback sections">{(["Review", "Optimize", "Pattern", "Interview"] as Tab[]).map(item => <button key={item} aria-pressed={tab === item} className={tab === item ? "selected" : ""} onClick={() => setTab(item)}>{item}</button>)}</div>
             <div className="result-content">{tab === "Review" && <><Section title="Review summary" text={review.summary}/><Section title="Correctness" text={review.correctness}/><div className="complexity"><Section title="Time complexity" text={review.timeComplexity}/><Section title="Space complexity" text={review.spaceComplexity}/></div><section className="result-section"><h4>Edge cases</h4><ul>{review.edgeCases.map((item, index) => <li key={index}><ReviewText>{item}</ReviewText></li>)}</ul></section></>}
@@ -295,6 +323,7 @@ export default function Workspace({ config }: { config: PublicConfig }) {
       </section>}
       </main>
     </div>
+    {review && <article className="print-report"><h1>{draft.title}</h1><p>LeetCode Mentor · {draft.language} · AI analysis; code not executed</p><Section title="Problem" text={draft.problem}/><h2>Submitted solution</h2><pre>{draft.solution}</pre><Section title="Summary" text={review.summary}/><Section title="Correctness" text={review.correctness}/><Section title="Time complexity" text={review.timeComplexity}/><Section title="Space complexity" text={review.spaceComplexity}/><h2>Edge cases</h2><ul>{review.edgeCases.map((item, index) => <li key={index}>{item}</li>)}</ul><Section title="Tradeoffs" text={review.tradeoffs}/><h2>Proposed optimization</h2><pre>{review.optimizedCode}</pre><Section title="Walkthrough" text={review.walkthrough}/><Section title={review.pattern} text={review.patternLesson}/><Section title="Practice next" text={review.nextPractice}/>{coaching && <><Section title="Interview explanation" text={coaching.explanation}/><Section title="Tradeoff discussion" text={coaching.tradeoff}/><Section title="Follow-up" text={coaching.followUp}/><Section title="Next repetition" text={coaching.nextRep}/></>}{pipelineReport && <><h2>Pipeline trace</h2><p>Total: {(pipelineReport.elapsedMs / 1000).toFixed(1)} seconds</p><ul>{pipelineReport.traces.map(trace => <li key={trace.id}>{agentCatalog.find(agent => agent.id === trace.id)!.name}: {trace.state} ({((trace.durationMs || 0) / 1000).toFixed(1)}s)</li>)}</ul>{pipelineReport.warnings.map(warning => <p key={warning}>{warning}</p>)}</>}</article>}
     {notice && <div className="toast" role="status"><Check size={16}/>{notice}</div>}
     {modal === "examples" && <Dialog title="Choose an example" close={() => setModal(null)}><div className="choice-list">{examples.map((item, index) => { const Icon = patternIcons[index]; return <button key={item.title} onClick={() => loadDraft({ ...item, language: "Python" })}><span className="panel-icon mint"><Icon size={18}/></span><span><strong>{item.title}</strong><small>{item.pattern} · {item.difficulty}</small></span><ArrowRight size={16}/></button>; })}</div></Dialog>}
     {modal === "new" && <Dialog title="Start a practice" close={() => setModal(null)}><div className="choice-list"><button onClick={() => loadDraft({ title: "Custom challenge", problem: "", solution: "", language: "Python" })}><span className="panel-icon mint"><Plus size={18}/></span><span><strong>Blank practice</strong><small>Bring your own problem and solution</small></span><ArrowRight size={16}/></button><button onClick={() => setModal("examples")}><span className="panel-icon pale"><BookOpen size={18}/></span><span><strong>Choose an example</strong><small>Start with a practice problem and code</small></span><ArrowRight size={16}/></button></div></Dialog>}
