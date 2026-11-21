@@ -1,5 +1,28 @@
 # Cloud deployment
 
+## Isolated deployment with an AWS-provided HTTPS URL
+
+`deploy/express.yaml` is the deployment used for LeetCode Mentor. It creates a dedicated VPC, subnets, ECS cluster, ECR repository, CodeBuild project and provider secret. ECS Express Mode manages the HTTPS endpoint and load balancer inside this dedicated network. It does not use or modify the System Design Simulator stack or its profiles. The service is capped at one task; existing sessions end during deployments.
+
+Install deployment dependencies with `uv pip install --python .venv/Scripts/python.exe -r deploy/requirements.txt`. Sign in with `aws login --profile leetcode-mentor --region us-east-2`. The helper requires that explicit profile and an expected account ID to avoid accidental deployment into another profile.
+
+Run these commands from the repository root, waiting for each stage to finish:
+
+```powershell
+./.venv/Scripts/python.exe deploy/aws_live.py prepare --profile leetcode-mentor --expected-account YOUR_ACCOUNT_ID
+./.venv/Scripts/python.exe deploy/aws_live.py status --profile leetcode-mentor --expected-account YOUR_ACCOUNT_ID
+# After CREATE_COMPLETE:
+./.venv/Scripts/python.exe deploy/aws_live.py build --profile leetcode-mentor --expected-account YOUR_ACCOUNT_ID
+# Check status until build_status is SUCCEEDED, then:
+./.venv/Scripts/python.exe deploy/aws_live.py launch --profile leetcode-mentor --expected-account YOUR_ACCOUNT_ID
+```
+
+`status` reports provisioning, build progress, and the final endpoint; `events` reports stack failures. `build` reads `GROQ_API_KEY` from your ignored local `.env` and sends it directly to Secrets Manager. The source zip uses an explicit allowlist excluding secrets, Git history and environments. Image tags are derived from the source contents. Rebuilding identical sources attempts to push the same immutable tag; reuse the successful build instead. The local build ID is recorded in `.venv/aws-deployment.json`.
+
+Billing includes Fargate, ALB, public IPv4, Secrets Manager, ECR, logs, source storage, CodeBuild and provider usage. Deleting the `leetcode-mentor` stack removes its running service and networking. ECR, source bucket, secret and logs are intentionally retained and must be reviewed separately for cleanup. No durable CloudTrail trail was configured in the account at deployment time; AWS event history provides limited audit history, not long-term retention. CloudFormation security compliance rules have not been evaluated by cfn-guard.
+
+## Alternative: bring your own domain and networking
+
 This is a Python Streamlit service, not a static site. The AWS template runs one Fargate task behind an HTTPS application load balancer. It requires an existing VPC, at least two public subnets in different availability zones, an issued ACM certificate, an ECR repository, and a Secrets Manager secret. Source migrations through Launch with AWS are not needed for this container path.
 
 ## Local preview
