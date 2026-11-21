@@ -1,0 +1,67 @@
+{
+  "endpoint": "https://le-80e062e4d2034c75b1f46046a682e5a3.ecs.us-east-2.on.aws",
+  "verifiedAt": "2026-11-21T23:35:43.955Z",
+  "quick": true,
+  "deep": {
+    "elapsedMs": 2069,
+    "traces": [
+      {
+        "id": "correctness",
+        "state": "completed",
+        "durationMs": 479,
+        "inputTokens": 274,
+        "outputTokens": 113,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "complexity",
+        "state": "completed",
+        "durationMs": 377,
+        "inputTokens": 274,
+        "outputTokens": 106,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "edges",
+        "state": "completed",
+        "durationMs": 793,
+        "inputTokens": 278,
+        "outputTokens": 212,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "optimizer",
+        "state": "completed",
+        "durationMs": 613,
+        "inputTokens": 285,
+        "outputTokens": 151,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "patterns",
+        "state": "completed",
+        "durationMs": 659,
+        "inputTokens": 289,
+        "outputTokens": 172,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "teacher",
+        "state": "completed",
+        "durationMs": 458,
+        "inputTokens": 270,
+        "outputTokens": 155,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "synthesis",
+        "state": "completed",
+        "durationMs": 1274,
+        "inputTokens": 972,
+        "outputTokens": 414,
+        "model": "openai/gpt-oss-120b"
+      }
+    ],
+    "warnings": []
+  }
+}
