@@ -8,6 +8,7 @@ from agents.reviewer import review_code
 from agents.optimizer import optimize_solution
 from agents.teacher import teach_pattern
 from main import extract_problem_info
+from agents.interviewer import coach_interview
 
 load_dotenv()
 st.set_page_config(page_title="LeetCode Mentor | Interview lab", page_icon="✦", layout="wide")
@@ -109,3 +110,28 @@ if "result" in st.session_state:
             st.markdown(result[field])
     report = "\n\n".join("## " + field.title() + "\n\n" + result[field] for field in ["problem", "solution", "analysis", "review", "optimized", "lesson"])
     st.download_button("Download your review", report, file_name="interview-review.md", mime="text/markdown", key="download_review")
+    st.divider()
+    st.subheader("03 / Defend your decisions")
+    st.markdown("Code is half the interview. Practice explaining **why your approach works** and how it changes when constraints shift.")
+    with st.form("interview_coach"):
+        target = st.selectbox("Practice focus", ["Software engineer", "Backend engineer", "Frontend engineer", "New graduate"])
+        explanation = st.text_area("Your 60-second explanation", max_chars=6000, placeholder="I chose this approach because… The time complexity is… One tradeoff is…")
+        coach_requested = st.form_submit_button("Coach my explanation", type="primary")
+    if coach_requested:
+        if not get_secret("GROQ_API_KEY"):
+            st.info("Configure GROQ_API_KEY on the server to enable coaching.")
+        else:
+            try:
+                with st.spinner("Preparing your interview rehearsal…"):
+                    coaching = coach_interview(Groq(api_key=get_secret("GROQ_API_KEY"), timeout=60, max_retries=1), result, target, explanation)
+                st.session_state.coaching = coaching.model_dump()
+            except Exception:
+                st.error("Coaching could not finish. Please retry. Your review is still available.")
+    if "coaching" in st.session_state:
+        coaching = st.session_state.coaching
+        for label, field in [("Your rehearsal", "explanation"), ("A tradeoff to defend", "tradeoff"), ("The interviewer asks…", "follow_up"), ("Your next deliberate rep", "next_rep")]:
+            with st.container(border=True):
+                st.markdown("#### " + label)
+                st.write(coaching[field])
+        coaching_report = "\n\n".join("## " + key.replace("_", " ").title() + "\n\n" + value for key, value in coaching.items())
+        st.download_button("Download interview practice", coaching_report, file_name="interview-practice.md", mime="text/markdown")
