@@ -2,6 +2,7 @@
 gitpython
 rich
 python-dotenv
-streamlit
+streamlit>=1.57,<2
 reportlab
 pandas
+pydantic>=2,<3

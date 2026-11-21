@@ -1,63 +1,44 @@
-# 🧠 LeetCode Mentor — Multi Agent AI System
+# LeetCode Mentor
 
-An AI-powered tool that analyzes your LeetCode solutions using 7 specialized agents, generates algorithm diagrams, and automatically pushes everything to GitHub.
+A focused coding interview practice lab built with Python, Streamlit, and Groq.
 
-## 🤖 Agents
+Paste a problem and your solution to get a correctness review, an optimized approach, and a pattern lesson. Then rehearse your explanation with an AI interview coach that challenges your tradeoffs and suggests your next practice exercise.
 
-| Agent | Role |
-|-------|------|
-| 🔍 **Agent 1 - Problem Analyst** | Breaks down the problem, constraints, and best data structures |
-| 🔎 **Agent 2 - Code Reviewer** | Reviews your code for bugs, complexity, and style |
-| ⚡ **Agent 3 - Solution Optimizer** | Suggests a more efficient solution with explanation |
-| 🎓 **Agent 4 - Pattern Teacher** | Teaches the underlying algorithm pattern |
-| 📊 **Agent 5 - Algorithm Diagram** | Generates a flowchart of how your solution works |
-| 🗺️ **Agent 6 - Pattern Diagram** | Visualizes the general pattern for future problems |
-| 📤 **Agent 7 - Git Agent** | Pushes solution + full analysis to GitHub automatically |
+## Run locally
 
-## ✨ Features
-
-- 🌐 Multi-language support (Python, Java, C++, JavaScript, Go, Rust)
-- ⚡ Parallel agent execution for 60% faster analysis
-- 📊 Algorithm flowchart visualization with Mermaid diagrams
-- 📄 PDF report export for every solved problem
-- 📈 Progress dashboard tracking problems by difficulty over time
-- 🔄 Auto GitHub commits building a documented solution history
-
-## 🛠️ Tech Stack
-
-- **Python** — core pipeline
-- **Groq API** — LLM inference
-- **Streamlit** — web interface
-- **GitPython** — automated GitHub commits
-- **ReportLab** — PDF generation
-- **Rich** — terminal UI
-
-## 🚀 Setup
-
-```bash
-git clone https://github.com/ARB726/leetcode-mentor.git
-cd leetcode-mentor
-python -m venv env
-env\Scripts\activate
-pip install -r requirements.txt
+```powershell
+uv venv .venv --python 3.12
+uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+./.venv/Scripts/python.exe -m streamlit run app.py
 ```
 
-Create a `.env` file:
-GROQ_API_KEY=your_groq_api_key
-GITHUB_USERNAME=your_github_username
-GITHUB_REPO=leetcode-solutions
-GITHUB_TOKEN=your_github_token
+Add `GROQ_API_KEY=your-key` to an ignored `.env` file. The workspace opens without credentials; reviews and coaching require a valid key. Code is sent to Groq only when you request AI feedback. Model output is guidance, not an executed correctness test.
 
-Run locally:
-```bash
-streamlit run app.py
+## What makes the practice useful
+
+- A complete loop from coding to explaining and handling changed constraints.
+- Four review stages with correct review → optimization → teaching dependencies.
+- Structured interview coaching grounded in the submitted code and your explanation.
+- Session-scoped results that survive widget reruns and can be downloaded as Markdown.
+- A session progress view with real practice counts rather than invented readiness scores.
+
+The web app does not automatically publish solutions to GitHub. Progress is in memory and ends when the browser session or server restarts. The legacy CLI and PDF utilities remain in the repository.
+
+## Tests
+
+```powershell
+uv pip install --python .venv/Scripts/python.exe pytest
+./.venv/Scripts/python.exe -m pytest -q
 ```
 
-Or use the CLI:
-```bash
-python main.py
-```
+Tests mock AI calls; they do not spend API credits. CI also validates the AWS template and builds the container.
 
-## 🌐 Live Demo
+## Cloud
 
-[leetcode-mentor-by-abdulraziq.streamlit.app](https://leetcode-mentor-by-abdulraziq.streamlit.app)
+See [DEPLOY.md](DEPLOY.md) for Docker preview, the AWS ECS/Fargate deployment, operational limits, and the three small PR branches. Cloud deployment requires account access and is not automatic.
+
+## Existing deployment
+
+The earlier Streamlit deployment is available at [leetcode-mentor-by-abdulraziq.streamlit.app](https://leetcode-mentor-by-abdulraziq.streamlit.app). It is separate from the AWS deployment and may run an earlier version.
+
+The repository also retains Groq-powered diagram generation, GitPython publishing, ReportLab PDF utilities, and the Rich terminal interface from the original app. The current web workspace uses the practice and coaching flow described above.
