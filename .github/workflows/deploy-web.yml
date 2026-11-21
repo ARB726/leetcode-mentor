@@ -1,0 +1,59 @@
+name: Deploy Mentor web
+on:
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: mentor-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      vars.MENTOR_CD_ENABLED == 'true' &&
+      ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: mentor-production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-2
+      AWS_DEFAULT_REGION: us-east-2
+      AWS_ACCOUNT_ID: '675345028735'
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      CF_DEPLOY_ROLE: ${{ vars.MENTOR_CF_ROLE_ARN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+      # Manual retries run the same checks before assuming any AWS role.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Validate release
+        working-directory: web
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+      - name: Reject outdated release
+        run: |
+          latest=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | cut -f1)
+          test "$RELEASE_SHA" = "$latest"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.MENTOR_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+          allowed-account-ids: '675345028735'
+      - name: Build, deploy, and verify isolated Mentor release
+        run: bash deploy/release-web.sh
