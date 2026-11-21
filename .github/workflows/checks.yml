@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt pytest cfn-lint==1.43.2
+      - run: pip install -r requirements.txt -r deploy/requirements.txt pytest cfn-lint==1.43.2
       - run: python -m pytest -q
-      - run: cfn-lint deploy/ecs.yaml
+      - run: cfn-lint deploy/*.yaml
       - run: docker build -t mentor:test .

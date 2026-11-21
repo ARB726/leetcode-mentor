@@ -1,0 +1,248 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Isolated LeetCode Mentor deployment with dedicated networking, container builder and an ECS Express HTTPS endpoint. No existing application resources are modified.
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+Parameters:
+  ImageUri:
+    Type: String
+    Default: ''
+    Description: Leave empty to prepare the builder; set to an immutable ECR image to launch
+Conditions:
+  LaunchApp: !Not [!Equals [!Ref ImageUri, '']]
+Resources:
+  # Dedicated networking prevents Express Mode from sharing another project's ALB.
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.84.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{Key: Name, Value: !Sub '${AWS::StackName}-vpc'}]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.84.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.84.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  AssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {RouteTableId: !Ref RouteTable, SubnetId: !Ref SubnetA}
+  AssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {RouteTableId: !Ref RouteTable, SubnetId: !Ref SubnetB}
+  Cluster:
+    Type: AWS::ECS::Cluster
+  Repository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: {ScanOnPush: true}
+      EncryptionConfiguration: {EncryptionType: AES256}
+  # Secrets are populated through Secrets Manager, never template parameters.
+  ProviderSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: Groq provider key for LeetCode Mentor only
+  BuildSources:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration: {Status: Enabled}
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireBuildSources
+            Status: Enabled
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration: {NoncurrentDays: 1}
+  BuildSourcesPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BuildSources
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt BuildSources.Arn, !Sub '${BuildSources.Arn}/*']
+            Condition: {Bool: {aws:SecureTransport: false}}
+  BuildLogs:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties: {RetentionInDays: 7}
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: codebuild.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: {aws:SourceAccount: !Ref AWS::AccountId}
+              ArnEquals:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:project/${AWS::StackName}-build'
+      Policies:
+        - PolicyName: BuildMentorOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload, ecr:PutImage]
+                Resource: !GetAtt Repository.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub '${BuildSources.Arn}/source/*'
+              - Effect: Allow
+                Action: s3:GetBucketLocation
+                Resource: !GetAtt BuildSources.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt BuildLogs.Arn
+  Builder:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${AWS::StackName}-build'
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 15
+      Artifacts: {Type: NO_ARTIFACTS}
+      Source:
+        Type: S3
+        Location: !Sub '${BuildSources}/source/current.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+            build:
+              commands:
+                - docker build --platform linux/amd64 -t "$IMAGE_URI" .
+            post_build:
+              commands:
+                - test "$CODEBUILD_BUILD_SUCCEEDING" = 1
+                - docker push "$IMAGE_URI"
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+      LogsConfig:
+        CloudWatchLogs: {Status: ENABLED, GroupName: !Ref BuildLogs}
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs-tasks.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: {aws:SourceAccount: !Ref AWS::AccountId}
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*'
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy']
+      Policies:
+        - PolicyName: ReadMentorKey
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref ProviderSecret
+  InfrastructureRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: {aws:SourceAccount: !Ref AWS::AccountId}
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices']
+  # Express manages HTTPS and the ALB inside this stack's dedicated VPC.
+  App:
+    Type: AWS::ECS::ExpressGatewayService
+    Condition: LaunchApp
+    DependsOn: [InternetRoute, AssociationA, AssociationB]
+    Properties:
+      Cluster: !Ref Cluster
+      ServiceName: leetcode-mentor
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      InfrastructureRoleArn: !GetAtt InfrastructureRole.Arn
+      HealthCheckPath: /_stcore/health
+      NetworkConfiguration:
+        Subnets: [!Ref SubnetA, !Ref SubnetB]
+      PrimaryContainer:
+        Image: !Ref ImageUri
+        ContainerPort: 8501
+        Secrets: [{Name: GROQ_API_KEY, ValueFrom: !Ref ProviderSecret}]
+      ScalingTarget: {MinTaskCount: 1, MaxTaskCount: 1}
+Outputs:
+  SourceBucket:
+    Value: !Ref BuildSources
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri
+  RepositoryName:
+    Value: !Ref Repository
+  BuildProject:
+    Value: !Ref Builder
+  SecretArn:
+    Value: !Ref ProviderSecret
+  ClusterArn:
+    Value: !GetAtt Cluster.Arn
+  ServiceArn:
+    Condition: LaunchApp
+    Value: !GetAtt App.ServiceArn
+  Endpoint:
+    Condition: LaunchApp
+    Value: !GetAtt App.Endpoint
