@@ -36,3 +36,9 @@ Tests mock AI calls; they do not spend API credits. CI also validates the AWS te
 ## Cloud
 
 See [DEPLOY.md](DEPLOY.md) for Docker preview, the AWS ECS/Fargate deployment, operational limits, and the three small PR branches. Cloud deployment requires account access and is not automatic.
+
+## Existing deployment
+
+The earlier Streamlit deployment is available at [leetcode-mentor-by-abdulraziq.streamlit.app](https://leetcode-mentor-by-abdulraziq.streamlit.app). It is separate from the AWS deployment and may run an earlier version.
+
+The repository also retains Groq-powered diagram generation, GitPython publishing, ReportLab PDF utilities, and the Rich terminal interface from the original app. The current web workspace uses the practice and coaching flow described above.
