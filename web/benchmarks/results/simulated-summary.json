@@ -1,0 +1,20 @@
+{
+  "fingerprint": "df09b39bc182f05c82acbe4b6560208d7a2fc08fc8a8b5dc5b9cd68190dff04d",
+  "mode": "simulated-scheduler",
+  "model": "SIMULATION-NO-PROVIDER",
+  "generatedAt": "2026-11-21T23:31:34.210Z",
+  "corpusSize": 50,
+  "selectedProblems": 50,
+  "repetitions": 1,
+  "summary": {
+    "mode": "simulated-scheduler",
+    "completedPairs": 50,
+    "sequentialMedianMs": 211,
+    "parallelMedianMs": 60,
+    "reductionPercent": 71.6,
+    "totalRuns": 100,
+    "runsWithUnavailableStages": 0,
+    "target60PercentMet": false,
+    "warning": "Synthetic scheduler measurement only. This is not provider performance and cannot substantiate a resume percentage."
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "fingerprint": "1a92156756e99ed20bc3837e325029a11e765577072d5e4b5717d95c2db15b37",
+  "mode": "live-provider",
+  "model": "openai/gpt-oss-120b",
+  "generatedAt": "2026-11-21T23:30:34.135Z",
+  "corpusSize": 50,
+  "selectedProblems": 2,
+  "repetitions": 1,
+  "rows": [
+    {
+      "id": "mentor-01",
+      "repetition": 0,
+      "execution": "sequential",
+      "elapsedMs": 6721,
+      "failedStages": 0,
+      "warnings": [],
+      "inputTokens": 3597,
+      "outputTokens": 2090,
+      "issueMentioned": null
+    },
+    {
+      "id": "mentor-01",
+      "repetition": 0,
+      "execution": "parallel",
+      "elapsedMs": 5868,
+      "failedStages": 1,
+      "warnings": [
+        "Review lead: The AI provider could not complete this request. Please retry."
+      ],
+      "inputTokens": 2030,
+      "outputTokens": 1214,
+      "issueMentioned": null
+    },
+    {
+      "id": "mentor-02",
+      "repetition": 0,
+      "execution": "parallel",
+      "elapsedMs": 3399,
+      "failedStages": 0,
+      "warnings": [],
+      "inputTokens": 2988,
+      "outputTokens": 1637,
+      "issueMentioned": null
+    },
+    {
+      "id": "mentor-02",
+      "repetition": 0,
+      "execution": "sequential",
+      "elapsedMs": 5143,
+      "failedStages": 0,
+      "warnings": [],
+      "inputTokens": 3037,
+      "outputTokens": 1672,
+      "issueMentioned": null
+    }
+  ],
+  "summary": {
+    "mode": "live-provider",
+    "completedPairs": 1,
+    "sequentialMedianMs": 5143,
+    "parallelMedianMs": 3399,
+    "reductionPercent": 33.9,
+    "totalRuns": 4,
+    "runsWithUnavailableStages": 1,
+    "target60PercentMet": false,
+    "warning": "Latency comparison against the same seven-stage sequential workflow, not human analysis or Quick review. Keyword matches are advisory; quality requires manual review. Inspect failures and repeat measurements."
+  }
+}
