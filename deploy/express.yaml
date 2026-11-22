@@ -8,6 +8,26 @@ Parameters:
     Type: String
     Default: ''
     Description: Leave empty to prepare the builder; set to an immutable ECR image to launch
+  SupabaseUrl:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^https://[a-z0-9-]+\.supabase\.co/?$'
+    Description: Dedicated Mentor Supabase project URL; empty disables accounts
+  SupabasePublishableKey:
+    Type: String
+    Default: ''
+    Description: Public publishable or legacy anon key only; never a secret or service-role key
+Rules:
+  SupabaseConfigurationTogether:
+    Assertions:
+      - Assert: !Or
+          - !And
+              - !Equals [!Ref SupabaseUrl, '']
+              - !Equals [!Ref SupabasePublishableKey, '']
+          - !And
+              - !Not [!Equals [!Ref SupabaseUrl, '']]
+              - !Not [!Equals [!Ref SupabasePublishableKey, '']]
+        AssertDescription: Supply both the Supabase URL and public key, or leave both empty
 Conditions:
   LaunchApp: !Not [!Equals [!Ref ImageUri, '']]
 Resources:
@@ -225,6 +245,10 @@ Resources:
       PrimaryContainer:
         Image: !Ref ImageUri
         ContainerPort: 8501
+        Environment:
+          - {Name: SUPABASE_URL, Value: !Ref SupabaseUrl}
+          - {Name: SUPABASE_PUBLISHABLE_KEY, Value: !Ref SupabasePublishableKey}
+          - {Name: SUPABASE_REVIEWS_TABLE, Value: mentor_reviews}
         Secrets: [{Name: GROQ_API_KEY, ValueFrom: !Ref ProviderSecret}]
       ScalingTarget: {MinTaskCount: 1, MaxTaskCount: 1}
 Outputs:
