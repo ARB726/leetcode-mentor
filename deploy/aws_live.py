@@ -1,11 +1,14 @@
 """Deploy only the named LeetCode Mentor stack using an explicit AWS profile."""
 import argparse
+import base64
 import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import sys
 import zipfile
+from uuid import uuid4
 
 import boto3
 from botocore.config import Config
@@ -15,6 +18,24 @@ from dotenv import dotenv_values
 ROOT = Path(__file__).resolve().parents[1]
 STACK = "leetcode-mentor"
 STATE = ROOT / ".venv" / "aws-deployment.json"
+
+
+def public_supabase_values():
+    values = dotenv_values(ROOT / ".env")
+    url = values.get("SUPABASE_URL", "")
+    key = values.get("SUPABASE_PUBLISHABLE_KEY") or values.get("SUPABASE_ANON_KEY", "")
+    if not re.fullmatch(r"https://[a-z0-9-]+\.supabase\.co/?", url or "") or not key:
+        raise ValueError("Set the dedicated Mentor SUPABASE_URL and public key in the ignored root .env")
+    public_key = key.startswith("sb_publishable_")
+    if not public_key:
+        try:
+            payload = key.split(".")[1]
+            public_key = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["role"] == "anon"
+        except (ValueError, IndexError, KeyError, TypeError):
+            public_key = False
+    if not public_key:
+        raise ValueError("Supabase configuration accepts publishable/anon keys only, never secret or service-role keys")
+    return url, key
 
 
 def source_archive(web=False):
@@ -67,6 +88,31 @@ def deploy(session, command, web=False):
             print(json.dumps({"stack_status": stack["StackStatus"]}))
         return
     stack, outputs = stack_details(cf)
+    if command in ["configure-supabase", "apply-supabase"]:
+        if not web:
+            raise ValueError("Supabase configuration requires --web")
+        state = json.loads(state_path.read_text()) if state_path.exists() else {}
+        if command == "configure-supabase":
+            url, public_key = public_supabase_values()
+            parameters = [{"ParameterKey": item["ParameterKey"], "UsePreviousValue": True} for item in stack.get("Parameters", []) if item["ParameterKey"] not in ["SupabaseUrl", "SupabasePublishableKey"]]
+            parameters += [{"ParameterKey": "SupabaseUrl", "ParameterValue": url}, {"ParameterKey": "SupabasePublishableKey", "ParameterValue": public_key}]
+            result = cf.create_change_set(StackName=STACK, ChangeSetName="mentor-supabase-" + uuid4().hex[:12], ChangeSetType="UPDATE", TemplateBody=template, Capabilities=["CAPABILITY_IAM"], Parameters=parameters)
+            state["supabase_change_set"] = result["Id"]
+            state_path.parent.mkdir(exist_ok=True)
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            print(json.dumps({"supabase_change_set": result["Id"], "next": "Wait for CREATE_COMPLETE, then apply-supabase validates the resource changes before execution"}))
+        else:
+            if not state.get("supabase_change_set"):
+                raise ValueError("Create the Supabase change set first")
+            change_set = cf.describe_change_set(StackName=STACK, ChangeSetName=state["supabase_change_set"])
+            if change_set.get("Status") != "CREATE_COMPLETE" or change_set.get("ExecutionStatus") != "AVAILABLE":
+                raise ValueError("Wait for an available CREATE_COMPLETE Supabase change set")
+            changes = change_set.get("Changes", [])
+            if change_set.get("StackName") != STACK or not changes or any(item["ResourceChange"].get("LogicalResourceId") != "App" or item["ResourceChange"].get("ResourceType") != "AWS::ECS::ExpressGatewayService" or item["ResourceChange"].get("Action") != "Modify" or item["ResourceChange"].get("Replacement") != "False" for item in changes):
+                raise ValueError("Refusing configuration changes outside a non-replacing modification of Mentor's App")
+            cf.execute_change_set(StackName=STACK, ChangeSetName=state["supabase_change_set"])
+            print(json.dumps({"configuring_supabase": True, "changed_resources": ["App"]}))
+        return
     if command == "status":
         print(json.dumps({"stack_status": stack["StackStatus"], "outputs": outputs}, indent=2))
         if state_path.exists():
@@ -128,7 +174,7 @@ def deploy(session, command, web=False):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["prepare", "status", "events", "build", "launch", "rollback"])
+    parser.add_argument("command", choices=["prepare", "status", "events", "build", "launch", "rollback", "configure-supabase", "apply-supabase"])
     parser.add_argument("--web", action="store_true", help="Build/release the Next.js app, preserving the existing provider secret")
     parser.add_argument("--profile", required=True)
     parser.add_argument("--expected-account", required=True)

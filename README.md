@@ -43,6 +43,8 @@ The repository includes [50 original benchmark tasks](web/benchmarks/corpus.ts),
 
 ## AWS and CI/CD
 
+Optional account features use a dedicated Mentor Supabase project. The repository integration adds personal public GitHub links, folder browsing, source-file imports, and review associations. Follow the [Supabase setup runbook](web/supabase/SETUP.md) before enabling accounts; this application does not create hosted projects or apply database migrations automatically.
+
 [Web release instructions](deploy/WEB_RELEASE.md) describe the isolated Mentor CodeBuild, ECR, and ECS deployment and rollback. [CI/CD design](deploy/CICD.md) covers PR tests, container smoke checks, OIDC, immutable image tags, environment protection, and opt-in production releases. Continuous deployment remains opt-in pending its dedicated roles and GitHub environment configuration.
 
 This deployment uses the dedicated `leetcode-mentor` stack and does not modify System Design Simulator. A branded hostname requires a domain controlled by the owner; the AWS-generated HTTPS URL remains available meanwhile.
