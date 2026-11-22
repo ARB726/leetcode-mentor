@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { Session } from "@supabase/supabase-js";
 import { browserSupabase } from "@/lib/browser-supabase";
 import Repositories from "@/components/repositories";
+import MotionToggle from "@/components/motion-toggle";
 import Markdown from "react-markdown";
 import {
   ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, Braces,
@@ -349,6 +350,7 @@ export default function Workspace({ config }: { config: PublicConfig }) {
     <div className="main-shell" inert={menuOpen}>
       <header className="topbar"><button ref={mobileMenu} className="mobile-menu icon-button" aria-label="Open navigation" aria-controls="workspace-sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb"><span>Workspace</span><ChevronRight size={13}/><strong>{pageTitle}</strong></div>
         <div className="session-pill"><i className="dot"/>{session ? "Account session" : "Browser session"}</div>{client && !session && <button className="top-login" onClick={openAuth}>Sign in <ArrowUpRight size={13}/></button>}
+        <MotionToggle/>
       </header>
       <main key={page} className="workspace-page" id="main-content" tabIndex={-1}>{page !== "repositories" && <div className="page-heading"><div><div className="eyebrow"><span className="eyeline"/>{page === "studio" ? "A little practice. A sharper instinct." : page === "history" ? "Your workspace" : "Study collection"}</div><h1>{pageTitle}</h1><p>{page === "studio" ? "Turn “I can solve it” into “I can explain it.” One thoughtful rep at a time." : page === "history" ? (session ? "Revisit the reviews saved to your account." : "Revisit the reviews saved in this browser tab.") : "Explore algorithm patterns through focused practice problems."}</p></div>
         {(page === "studio" || page === "history") && <button className="button light" onClick={() => setModal("new")}><Plus size={16}/>New practice</button>}
