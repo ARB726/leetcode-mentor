@@ -2,7 +2,7 @@
 
 Create a **new** Supabase project named `leetcode-mentor` in the user's selected organization. Use the Free plan when an available free project slot exists; do not upgrade a plan to bypass quota without the owner's instruction. Prefer an available US East region near the existing Ohio AWS service. This feature does not reuse System Design Simulator's database, users, keys, or tables.
 
-Project creation and hosted configuration require a connected Supabase account. No hosted project has been created by the application itself. The app never takes a Supabase management token or service-role key from visitors.
+The dedicated production project was created on the Free plan in ARB726's Org on November 22, 2026: `rcedusyonevderniabxd` (US East Ohio). Its dashboard is https://supabase.com/dashboard/project/rcedusyonevderniabxd. The app never takes a Supabase management token or service-role key from visitors.
 
 ## Database
 
@@ -10,8 +10,9 @@ Inspect the new project's schemas, then apply these SQL files in order:
 
 1. `mentor_reviews.sql`
 2. `mentor_repositories.sql`
+3. `migrations/20261122192035_index_review_owned_repository.sql`
 
-They create Mentor-only tables, owner policies, and an owner-qualified foreign key. Unlinking a repository clears the association while preserving saved reviews. The migration intentionally fails on conflicting existing objects rather than silently overwriting policies. An embedded real PostgreSQL test verifies syntax, owner isolation, cross-owner foreign-key rejection, anonymous access restrictions, and unlink behavior. Hosted Supabase verification is still required after applying them.
+They create Mentor-only tables, owner policies, and an indexed owner-qualified foreign key. Unlinking a repository clears the association while preserving saved reviews. The migration intentionally fails on conflicting existing objects rather than silently overwriting policies. An embedded real PostgreSQL test verifies syntax, owner isolation, cross-owner foreign-key rejection, anonymous access restrictions, and unlink behavior. All three migrations have been applied to the dedicated project. A hosted transaction verified owner isolation, rejected cross-owner inserts and repository references, anonymous repository access denial, and review preservation after unlinking; it rolled back all test data. Security and performance advisors returned no findings after indexing. This SQL verification does not establish that end-user email or GitHub sign-in works.
 
 ## Sign-in
 

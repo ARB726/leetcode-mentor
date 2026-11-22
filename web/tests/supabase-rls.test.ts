@@ -16,6 +16,7 @@ test("real PostgreSQL migrations enforce tenant isolation and preserve reviews w
       insert into auth.users values ('${alice}'), ('${bob}');`);
     await db.exec(readFileSync("supabase/mentor_reviews.sql", "utf8"));
     await db.exec(readFileSync("supabase/mentor_repositories.sql", "utf8"));
+    await db.exec(readFileSync("supabase/migrations/20261122192035_index_review_owned_repository.sql", "utf8"));
     await db.query("insert into mentor_repositories(id,user_id,github_id,owner,name,default_branch) values ($1,$2,1,'alice','project','main'),($3,$4,2,'bob','project','main')", [aliceRepo, alice, bobRepo, bob]);
     await db.exec("set role authenticated");
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [alice]);
