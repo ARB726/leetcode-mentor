@@ -1,8 +1,10 @@
 # LeetCode Mentor
 
-A coding interview practice studio built with Next.js, TypeScript, and Groq, hosted on an isolated AWS ECS/Fargate service.
+A deployed AI code-review application with structured model outputs, six concurrent specialists, a synthesis stage, streamed execution traces, and owner-scoped repository imports. Built with Next.js, TypeScript, Groq, Supabase, and AWS ECS/Fargate.
 
 [Open the AWS app](https://le-80e062e4d2034c75b1f46046a682e5a3.ecs.us-east-2.on.aws)
+
+[AI engineering case study](docs/AI_ENGINEERING.md) · [Benchmark evidence](web/benchmarks/RESULTS.md) · [Deployment and rollback](deploy/WEB_RELEASE.md)
 
 ## Practice, understand, explain
 
