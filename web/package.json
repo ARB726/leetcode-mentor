@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 8501",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "evaluate:quality": "tsx scripts/evaluate-quality.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
