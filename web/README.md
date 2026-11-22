@@ -8,4 +8,14 @@ The optional `supabase/mentor_reviews.sql` creates a new Mentor-only table and o
 
 Only the public Supabase URL/key reaches the browser. Keep `GROQ_API_KEY` server-side. AI feedback does not execute code. Demo throttles are per process and reset on restart; use authentication and an external rate limiter before expanding a public deployment.
 
-This directory is the Next.js replacement under review. The root Streamlit application and its deployment continue to work until a web release is explicitly deployed.
+This directory contains the AWS-hosted Next.js workspace. The root Streamlit source remains available as a separate legacy application and rollback option.
+
+## Seven-specialist reviews
+
+Deep review runs six independent model calls for correctness, complexity, edge cases, optimization, patterns, and explanation, then a seventh call reconciles the findings. Progress streams as newline-delimited JSON. Quick review retains the single-call baseline. The optional interview rehearsal is a separate, user-requested call and is not counted among the seven review stages.
+
+Deep reviews have bounded fan-out, two per-process admission slots, provider retries, per-call and overall timeouts, cancellation, and partial-result reporting. The UI displays actual stage timings and token usage from successful calls; failed calls can consume unreported provider tokens. These are asynchronous in-request workflows, not durable background jobs. A restart or disconnect ends the run. Use a durable job queue before promising restart recovery or scaling across replicas.
+
+Print / PDF opens the browser print dialog with the full review, code, coaching, and stage trace. Choose Save as PDF. Markdown downloads remain available. Source code is not executed and solutions are not automatically committed to GitHub.
+
+See [the benchmark protocol](benchmarks/README.md) for the 50-task corpus and honest sequential/parallel comparisons. The 60% improvement is a target until supported by complete live measurements, not a product claim.

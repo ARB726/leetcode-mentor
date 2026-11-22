@@ -15,7 +15,7 @@ test("six specialists overlap, concurrency is bounded, synthesis waits for all f
   const runner: AgentRunner = async (id, _schema, _prompt, payload) => {
     if (id === "synthesis") {
       assert.equal(finished.size, 6);
-      assert.equal(Object.keys((payload as { findings: object }).findings).length, 6);
+      assert.equal(Object.keys((payload as { draftReview: object }).draftReview).length, 11);
       return { ...metadata, value: review };
     }
     peak = Math.max(peak, ++active);

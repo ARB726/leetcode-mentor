@@ -12,5 +12,9 @@ export type Review = {
   nextPractice: string;
 };
 export type Coaching = { explanation: string; tradeoff: string; followUp: string; nextRep: string };
-export type Practice = { id: string; title: string; problem: string; solution: string; language: string; createdAt: string; review: Review; coaching?: Coaching };
+export type RepositorySource = { repositoryId: string; path: string; ref: string; sha: string };
+export type LinkedRepository = { id: string; fullName: string; url: string; description: string; defaultBranch: string; language: string | null; createdAt: string };
+export type RepositoryEntry = { name: string; path: string; type: "file" | "dir"; language: string | null; size: number };
+export type ImportedFile = { code: string; language: string; name: string; url: string; source: RepositorySource };
+export type Practice = { id: string; title: string; problem: string; solution: string; language: string; createdAt: string; review: Review; coaching?: Coaching; source?: RepositorySource };
 export type PublicConfig = { aiReady: boolean; supabaseUrl: string; supabaseKey: string; tableName: string };
